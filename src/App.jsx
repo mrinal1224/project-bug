@@ -1,49 +1,47 @@
-import {useEffect,useMemo,useState} from 'react'
+// SUPPORT_DESK_REBUILD_V1
+import { useEffect, useMemo, useState } from 'react'
 
-const initialTasks=[
-{id:1,title:'Design onboarding flow',owner:'Aarav',status:'In Progress',priority:'High',points:5},
-{id:2,title:'Implement analytics cards',owner:'Meera',status:'Todo',priority:'Medium',points:3},
-{id:3,title:'Fix mobile navigation',owner:'Kabir',status:'Done',priority:'High',points:2},
-{id:4,title:'Add export endpoint',owner:'Ira',status:'In Progress',priority:'Low',points:3},
-{id:5,title:'Write release notes',owner:'Aarav',status:'Todo',priority:'Low',points:1},
-{id:6,title:'QA recurring billing',owner:'Meera',status:'Done',priority:'Medium',points:5},
+const tickets=[
+{id:1042,title:'Checkout fails for returning customers',customer:'Riya Sen',priority:'High',status:'Open',assignee:'Aarav',category:'Billing',messages:5},
+{id:1041,title:'Cannot export monthly report',customer:'Kunal Shah',priority:'Medium',status:'Pending',assignee:'Meera',category:'Reports',messages:3},
+{id:1040,title:'Invite link redirects to login',customer:'Nisha Roy',priority:'High',status:'Open',assignee:'Kabir',category:'Auth',messages:8},
+{id:1039,title:'Dark mode preference resets',customer:'Dev Malhotra',priority:'Low',status:'Resolved',assignee:'Aarav',category:'UI',messages:2},
+{id:1038,title:'Webhook events arrive twice',customer:'Ananya Das',priority:'High',status:'Open',assignee:'Meera',category:'Integrations',messages:11},
+{id:1037,title:'Invoice PDF has wrong timezone',customer:'Rohit Jain',priority:'Medium',status:'Pending',assignee:'Ira',category:'Billing',messages:4},
 ]
 
-function StatCard({label,value,trend}){return <div className="stat-card"><span className="muted">{label}</span><strong>{value}</strong><small>{trend}</small></div>}
+const agents=['All agents','Aarav','Meera','Kabir','Ira']
+const states=['All status','Open','Pending','Resolved']
 
 export default function App(){
-const[tasks,setTasks]=useState(initialTasks)
-const[query,setQuery]=useState('')
-const[status,setStatus]=useState('All')
-const[sortBy,setSortBy]=useState('points')
-const[selectedTask,setSelectedTask]=useState(null)
-const[isDark,setIsDark]=useState(false)
-const[lastSaved,setLastSaved]=useState('Just now')
+const[list,setList]=useState(tickets)
+const[selectedId,setSelectedId]=useState(1042)
+const[q,setQ]=useState('')
+const[state,setState]=useState('All status')
+const[agent,setAgent]=useState('All agents')
+const[sort,setSort]=useState('latest')
+const[reply,setReply]=useState('')
+const[sending,setSending]=useState(false)
+const[dark,setDark]=useState(false)
 
-const filteredTasks=useMemo(()=>{
-const result=tasks.filter(t=>status==='All'||t.status===status).filter(t=>(t.title+' '+t.owner+' '+t.priority).toLowerCase().includes(query.toLowerCase()))
-return [...result].sort((a,b)=>sortBy==='points'?b.points-a.points:sortBy==='priority'?({High:0,Medium:1,Low:2}[a.priority]-{High:0,Medium:1,Low:2}[b.priority]):a.title.localeCompare(b.title))
-},[tasks,query,status,sortBy])
+useEffect(()=>{document.documentElement.dataset.theme=dark?'dark':'light'},[dark])
 
-const completed=tasks.filter(t=>t.status==='Done').length
-const totalPoints=tasks.reduce((s,t)=>s+t.points,0)
-const highPriority=tasks.filter(t=>t.priority==='High').length
+const rows=useMemo(()=>{let r=list.filter(t=>(state==='All status'||t.status===state)&&(agent==='All agents'||t.assignee===agent)&&(t.title+' '+t.customer+' '+t.category).toLowerCase().includes(q.toLowerCase()));if(sort==='priority'){const rank={High:0,Medium:1,Low:2};r=[...r].sort((a,b)=>rank[a.priority]-rank[b.priority])}if(sort==='activity')r=[...r].sort((a,b)=>b.messages-a.messages);return r},[list,state,agent,q,sort])
+const selected=list.find(t=>t.id===selectedId)||rows[0]
+const open=list.filter(t=>t.status==='Open').length
+const pending=list.filter(t=>t.status==='Pending').length
+const urgent=list.filter(t=>t.priority==='High'&&t.status!=='Resolved').length
 
-useEffect(()=>{document.body.dataset.theme=isDark?'dark':'light'},[isDark])
-useEffect(()=>{const saved=localStorage.getItem('pulseboard-tasks');if(saved)setTasks(JSON.parse(saved))},[])
-
-function updateStatus(id,nextStatus){setTasks(current=>current.map(t=>t.id===id?{...t,status:nextStatus}:t));setLastSaved('Unsaved changes')}
-function saveChanges(){localStorage.setItem('pulseboard-tasks',JSON.stringify(tasks));setLastSaved('Saved just now')}
-function resetBoard(){setTasks(initialTasks);setLastSaved('Reset — not saved')}
+function update(id,status){setList(x=>x.map(t=>t.id===id?{...t,status}:t))}
+function send(){if(!reply.trim()||!selected)return;setSending(true);setTimeout(()=>{setList(x=>x.map(t=>t.id===selected.id?{...t,messages:t.messages+1,status:'Pending'}:t));setReply('');setSending(false)},600)}
 
 return <div className="app-shell">
-<header className="topbar"><div><p className="eyebrow">PULSEBOARD</p><h1>Engineering Sprint</h1></div><div className="top-actions"><span className="save-state">{lastSaved}</span><button className="ghost" onClick={()=>setIsDark(v=>!v)}>{isDark?'Light mode':'Dark mode'}</button><button className="primary" onClick={saveChanges}>Save changes</button></div></header>
-<main>
-<section className="hero-grid"><div className="hero-copy"><span className="pill">Sprint 24 · 9 days left</span><h2>Ship the next iteration without losing the plot.</h2><p>Track work, spot bottlenecks, and keep ownership clear across the team.</p></div><div className="stats-grid"><StatCard label="Completed" value={completed+'/'+tasks.length} trend="+2 this week"/><StatCard label="Story points" value={totalPoints} trend="82% planned"/><StatCard label="High priority" value={highPriority} trend="Needs attention"/></div></section>
-<section className="toolbar panel"><div className="search-wrap"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search tasks, owners..."/></div><select value={status} onChange={e=>setStatus(e.target.value)}><option>All</option><option>Todo</option><option>In Progress</option><option>Done</option></select><select value={sortBy} onChange={e=>setSortBy(e.target.value)}><option value="points">Sort: points</option><option value="priority">Sort: priority</option><option value="title">Sort: title</option></select><button className="ghost" onClick={resetBoard}>Reset</button></section>
-<section className="content-grid"><div className="panel task-panel"><div className="section-heading"><div><span className="eyebrow">CURRENT WORK</span><h3>Task board</h3></div><span className="count">{filteredTasks.length} visible</span></div><div className="task-list">{filteredTasks.map(task=><article className="task-row" key={task.id} onClick={()=>setSelectedTask(task)}><div className={'status-dot '+task.status.toLowerCase().replace(' ','-')}/><div className="task-main"><h4>{task.title}</h4><div className="meta"><span>{task.owner}</span><span>•</span><span>{task.points} pts</span></div></div><select value={task.status} onClick={e=>e.stopPropagation()} onChange={e=>updateStatus(task.id,e.target.value)}><option>Todo</option><option>In Progress</option><option>Done</option></select><span className={'priority '+task.priority.toLowerCase()}>{task.priority}</span></article>)}</div></div>
-<aside className="panel insight-panel"><div className="section-heading"><div><span className="eyebrow">TEAM PULSE</span><h3>Delivery health</h3></div></div><div className="health-ring"><span>78%</span></div><p className="health-copy">The sprint is on track, but two high-priority tasks are still open.</p><div className="mini-list"><div><span>Meera</span><b>8 pts</b></div><div><span>Aarav</span><b>6 pts</b></div><div><span>Kabir</span><b>2 pts</b></div></div></aside></section>
-</main>
-{selectedTask&&<div className="modal-backdrop" onClick={()=>setSelectedTask(null)}><div className="modal" onClick={e=>e.stopPropagation()}><button className="modal-close" onClick={()=>setSelectedTask(null)}>×</button><span className="eyebrow">TASK DETAILS</span><h3>{selectedTask.title}</h3><p>Owner: {selectedTask.owner}</p><p>Priority: {selectedTask.priority} · {selectedTask.points} story points</p><button className="primary wide" onClick={()=>{updateStatus(selectedTask.id,selectedTask.status==='Done'?'Todo':'Done');setSelectedTask(null)}}>{selectedTask.status==='Done'?'Re-open task':'Mark complete'}</button></div></div>}
+<aside className="sidebar"><div className="brand"><b>HelpDesk</b><span>PRO</span></div><button className="nav active">▣ Inbox <em>{open}</em></button><button className="nav">◫ My tickets</button><button className="nav">◉ Customers</button><button className="nav">⌁ Automations</button><div className="spacer"/><button className="nav">⚙ Settings</button><div className="user"><b>Support Lead</b><small>Online</small></div></aside>
+<main className="main"><header className="header"><div><span className="kicker">SUPPORT OPERATIONS</span><h1>Inbox</h1></div><div className="actions"><button onClick={()=>setDark(v=>!v)}>{dark?'☀':'☾'}</button><button className="primary">＋ New ticket</button></div></header>
+<section className="stats"><div><span>Open</span><b>{open}</b><small>+3 today</small></div><div><span>Pending</span><b>{pending}</b><small>Awaiting customer</small></div><div><span>High priority</span><b>{urgent}</b><small>Needs attention</small></div><div><span>SLA health</span><b>96%</b><small>↑ 2.4% this week</small></div></section>
+<section className="filters"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search tickets, customers, categories..."/><select value={state} onChange={e=>setState(e.target.value)}>{states.map(x=><option key={x}>{x}</option>)}</select><select value={agent} onChange={e=>setAgent(e.target.value)}>{agents.map(x=><option key={x}>{x}</option>)}</select><select value={sort} onChange={e=>setSort(e.target.value)}><option value="latest">Sort: latest</option><option value="priority">Sort: priority</option><option value="activity">Sort: activity</option></select></section>
+<section className="grid"><div className="panel queue"><div className="panel-head"><div><span className="kicker">QUEUE</span><h2>{rows.length} tickets</h2></div><small>● Live</small></div>{rows.map(t=><button className={'ticket '+(selected?.id===t.id?'selected':'')} key={t.id} onClick={()=>setSelectedId(t.id)}><div><span>#{t.id}</span><i className={t.priority.toLowerCase()}>{t.priority}</i><i className={t.status.toLowerCase()}>{t.status}</i></div><strong>{t.title}</strong><p>{t.customer} · {t.category}</p><small>{t.assignee} · {t.messages} messages</small></button>)}</div>
+<div className="panel conversation">{selected&&<><div className="conversation-head"><div><span className="kicker">#{selected.id} · {selected.category}</span><h2>{selected.title}</h2><p>{selected.customer} · customer report</p></div><select value={selected.status} onChange={e=>update(selected.id,e.target.value)}><option>Open</option><option>Pending</option><option>Resolved</option></select></div><div className="messages"><article><b>{selected.customer}</b><small>10:12</small><p>Checkout started failing after I updated my card. Existing subscriptions still work, but new payments show an error.</p></article><article className="agent"><b>Support Lead</b><small>10:18</small><p>Thanks for the report. I’m checking payment logs and account state now.</p></article><article><b>{selected.customer}</b><small>10:24</small><p>The issue seems to happen only with the saved payment method.</p></article></div><div className="composer"><textarea value={reply} onChange={e=>setReply(e.target.value)} placeholder="Write a reply..."/><button className="primary" disabled={sending||!reply.trim()} onClick={send}>{sending?'Sending...':'Send reply'}</button></div></>}</div>
+<aside className="panel details"><span className="kicker">CUSTOMER</span><h3>{selected?.customer}</h3><p>Pro account · 18.4k MRR</p><hr/><span className="kicker">CUSTOMER HEALTH</span><div className="score">84 <small>/100</small></div><div className="bar"><i/></div><hr/><span className="kicker">INTERNAL NOTE</span><div className="note">3 failed payment attempts this month. Check saved payment token before escalating.</div></aside></section></main>
 </div>
 }
